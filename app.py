@@ -1,8 +1,10 @@
 import streamlit as st
-from openai import OpenAI
 from datetime import datetime
 import os
+import requests
+
 st.cache_resource.clear()
+
 # ------------------ PAGE CONFIG ------------------
 st.set_page_config(
     page_title="GameMaster AI 🎮",
@@ -11,11 +13,11 @@ st.set_page_config(
 )
 
 # ------------------ API KEY CHECK ------------------
-if "OPENAI_API_KEY" not in st.secrets:
-    st.error("❌ OPENAI_API_KEY not found in Streamlit Secrets.")
+if "OPENROUTER_API_KEY" not in st.secrets:
+    st.error("❌ OPENROUTER_API_KEY not found in Streamlit Secrets.")
     st.stop()
 
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+OPENROUTER_API_KEY = st.secrets["OPENROUTER_API_KEY"]
 
 # ------------------ UI HEADER ------------------
 st.title("🎮 GameMaster AI – The Ultimate Gaming Agent")
@@ -40,26 +42,12 @@ feature = st.sidebar.radio(
     ]
 )
 
-# 🔹 Multilingual Support (ADDED)
 language = st.sidebar.selectbox(
     "Select Output Language",
     [
-        "English",
-        "Hindi",
-        "Marathi",
-        "Tamil",
-        "Telugu",
-        "Kannada",
-        "Malayalam",
-        "Bengali",
-        "Gujarati",
-        "Punjabi",
-        "Spanish",
-        "French",
-        "German",
-        "Japanese",
-        "Korean",
-        "Chinese"
+        "English","Hindi","Marathi","Tamil","Telugu","Kannada","Malayalam",
+        "Bengali","Gujarati","Punjabi","Spanish","French","German",
+        "Japanese","Korean","Chinese"
     ]
 )
 
@@ -143,17 +131,30 @@ User Input:
 {user_input}
 """
 
-# ------------------ OPENAI CALL ------------------
+# ------------------ OPENROUTER CALL ------------------
 def generate_response(prompt):
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
+    url = "https://openrouter.ai/api/v1/chat/completions"
+
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://streamlit.io",
+        "X-Title": "GameMaster AI"
+    }
+
+    payload = {
+        "model": "openai/gpt-4o-mini",  # can swap models anytime
+        "messages": [
             {"role": "system", "content": "You are a professional game development AI agent."},
             {"role": "user", "content": prompt}
         ],
-        temperature=0.8
-    )
-    return response.choices[0].message.content
+        "temperature": 0.8
+    }
+
+    response = requests.post(url, headers=headers, json=payload)
+    response.raise_for_status()
+
+    return response.json()["choices"][0]["message"]["content"]
 
 # ------------------ FILE SAVE ------------------
 def save_output(feature, content, language):
@@ -173,13 +174,11 @@ if generate:
             final_prompt = build_prompt(feature, user_prompt, language)
             output = generate_response(final_prompt)
 
-        # Save file automatically
         file_path = save_output(feature, output, language)
 
         st.subheader(f"🧠 Agent Output ({language})")
         st.markdown(output)
 
-        # Auto-ready download
         with open(file_path, "rb") as file:
             st.download_button(
                 label="⬇️ Download Agent Output",
